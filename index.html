@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Arcane Horizon: Midterm Destress Adventure</title>
 
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Google Fonts: Cinzel & Inter -->
+  <!-- Google Fonts: Cinzel, Cinzel Decorative & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
@@ -16,13 +16,13 @@
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <!-- Tone.js for Web Audio procedural synthesizer and dice SFX -->
+  <!-- Tone.js for procedural Web Audio drone synth and dice SFX -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
-  <!-- QRCode.js library for offline/online client QR generation -->
+  <!-- QRCode.js library for on-the-fly client QR generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <!-- Paho MQTT client for zero-config, cross-device real-time sync across laptops and mobile phones -->
+  <!-- Paho MQTT client for cross-device wireless synchronization -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 
   <style>
@@ -230,14 +230,12 @@
               Awaiting roll submission phase to generate outcomes...
             </div>
           </div>
-        </div>
 
-        <!-- Iterative Tweak / Re-consult Prompt Box -->
-        <div id="ai-refine-box" class="hidden mt-4 pt-3 border-t border-slate-800">
-          <div class="flex gap-2">
-            <input type="text" id="ai-tweak-input" placeholder="Tweak direction (e.g. 'Make it darker, space wizard tears void rift, boss enrages')..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-            <button onclick="refineAiOutcomes()" class="px-3.5 py-2 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs transition flex items-center gap-1">
-              <i class="fa-solid fa-arrows-rotate"></i> Re-Synthesize
+          <!-- AI Iterative Refinement Bar -->
+          <div id="ai-refine-box" class="hidden mt-3 pt-3 border-t border-slate-800 flex items-center gap-2">
+            <input type="text" id="ai-tweak-input" placeholder="Tweak direction (e.g. make it darker, boss goes berserk...)" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            <button onclick="refineAiOutcomes()" class="px-3 py-1.5 rounded-xl bg-indigo-600/40 hover:bg-indigo-600 text-indigo-200 text-xs font-bold border border-indigo-500/40 transition">
+              <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Tweak
             </button>
           </div>
         </div>
@@ -254,7 +252,7 @@
           <p class="text-xs text-slate-400 mt-0.5">Register walk-in students, hand over character passes via instant QR, and manage Calm (HP).</p>
         </div>
 
-        <!-- Quick Walk-in Enrollment Bar -->
+        <!-- Quick Walk-in Enrollment Bar & Session Reset -->
         <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <input type="text" id="new-player-name" placeholder="Student Name (e.g. Maya)" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
           <select id="new-player-affinity" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500">
@@ -272,6 +270,9 @@
           </select>
           <button onclick="registerWalkInPlayer()" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5">
             <i class="fa-solid fa-user-plus"></i> Enroll Student
+          </button>
+          <button onclick="clearAllOldCharacters()" class="px-2.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800/60 text-rose-300 text-xs font-semibold transition" title="Clear all previous characters and start fresh">
+            <i class="fa-solid fa-trash-can mr-1"></i> Reset Roster
           </button>
         </div>
       </div>
@@ -567,6 +568,7 @@
     </div>
   </div>
 
+  <!-- Toast Notification Bar -->
   <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 border border-amber-500/40 text-amber-200 px-4 py-2.5 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2">
     <i class="fa-solid fa-circle-info text-amber-400"></i>
     <span id="toast-text">Message</span>
@@ -803,7 +805,6 @@
       const broker = BROKER_LIST[currentBrokerIdx];
       try {
         console.log(`[Network] Connecting to ${broker.host}:${broker.port}${broker.path}...`);
-        // Fixed: Paho MQTT constructor requires 4 arguments (host, port, path, clientId)
         mqttClient = new Paho.MQTT.Client(broker.host, Number(broker.port), broker.path, clientId);
 
         mqttClient.onConnectionLost = (responseObject) => {
@@ -886,24 +887,19 @@
           publishNetworkState();
         }
       } else if (data.type === 'FULL_STATE_SYNC') {
-        const mergedPlayers = [...gameState.players];
-        if (Array.isArray(data.state.players)) {
-          data.state.players.forEach(remotePlayer => {
-            const idx = mergedPlayers.findIndex(p => p.id === remotePlayer.id || p.pin === remotePlayer.pin);
-            if (idx >= 0) {
-              mergedPlayers[idx] = { ...mergedPlayers[idx], ...remotePlayer };
-            } else {
-              mergedPlayers.push(remotePlayer);
-            }
-          });
+        // Authoritative Rule: The GM laptop is the sole master authority.
+        // It never accepts FULL_STATE_SYNC from any other client.
+        if (gameState.authenticatedRole === 'gm') {
+          return;
         }
 
+        // Non-GM clients (Player & Stage) adopt the GM's official roster directly
         gameState.currentPhase = data.state.currentPhase || gameState.currentPhase;
         gameState.activeNodeId = data.state.activeNodeId || gameState.activeNodeId;
         gameState.bossHp = (typeof data.state.bossHp === 'number') ? data.state.bossHp : gameState.bossHp;
         gameState.bossMaxHp = data.state.bossMaxHp || gameState.bossMaxHp;
         gameState.storyline = data.state.storyline || gameState.storyline;
-        gameState.players = mergedPlayers;
+        gameState.players = Array.isArray(data.state.players) ? data.state.players : gameState.players;
         gameState.submissions = data.state.submissions || gameState.submissions;
 
         renderAllViews();
@@ -926,16 +922,29 @@
             gameState.players.push(p);
             showToast(`✨ ${p.name} joined the chamber!`);
             if (gameState.authenticatedRole === 'gm') {
-              publishNetworkState();
+              saveStateAndBroadcast();
             }
             renderAllViews();
           }
         }
+      } else if (data.type === 'PLAYER_REMOVE') {
+        gameState.players = gameState.players.filter(p => p.id !== data.playerId);
+        delete gameState.submissions[data.playerId];
+        delete playerRollCache[data.playerId];
+        renderAllViews();
+      } else if (data.type === 'ROSTER_RESET') {
+        gameState.players = [];
+        gameState.submissions = {};
+        playerRollCache = {};
+        renderAllViews();
       } else if (data.type === 'PLAYER_SUBMIT') {
         const sub = data.submission;
         if (sub) {
           gameState.submissions[sub.playerId] = sub;
           showToast(`🎲 ${sub.playerName} submitted roll of ${sub.sum}!`);
+          if (gameState.authenticatedRole === 'gm') {
+            saveStateAndBroadcast();
+          }
           renderAllViews();
         }
       }
@@ -955,6 +964,9 @@
     }
 
     function publishNetworkState() {
+      // Only the GM may broadcast the full authoritative state!
+      if (gameState.authenticatedRole !== 'gm') return;
+
       sendNetworkPacket({
         type: 'FULL_STATE_SYNC',
         state: {
@@ -970,233 +982,270 @@
     }
 
     function saveStateAndBroadcast() {
-      try {
-        localStorage.setItem('dnd_lite_state_v2', JSON.stringify(gameState));
-      } catch (e) {}
-      publishNetworkState();
-    }
-
-    function loadInitialState() {
-      try {
-        const stored = localStorage.getItem('dnd_lite_state_v2');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed && Array.isArray(parsed.players)) {
-            gameState = { ...gameState, ...parsed };
-          }
-        }
-      } catch (e) {
-        console.warn("Could not load stored state:", e);
+      if (gameState.authenticatedRole === 'gm') {
+        try {
+          localStorage.setItem('dnd_lite_state_' + activeRoomId, JSON.stringify(gameState));
+        } catch (e) {}
+        publishNetworkState();
       }
-
-      if (!gameState.players) {
-        gameState.players = [];
-      }
-
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlCode = urlParams.get('code');
-      const urlName = urlParams.get('name');
-      const urlAffinity = urlParams.get('elem') || 'Fire';
-      const urlLvl = parseInt(urlParams.get('lvl') || '1', 10);
-      const urlHp = parseInt(urlParams.get('hp') || '20', 10);
-      const urlGm = urlParams.get('gm') || urlParams.get('key');
-      const urlScreen = urlParams.get('screen') || urlParams.get('view');
-      const urlRole = urlParams.get('role');
-
-      // 1. Stealth GM Bookmark: e.g. ?gm=TheO opens GM Console directly
-      if (urlGm && urlGm.toUpperCase() === MASTER_GM_KEY) {
-        verifyPasscode(urlGm);
-      }
-      // 2. Stage Projector Bookmark: e.g. ?screen=stage opens Projector view directly
-      else if (urlScreen && urlScreen.toLowerCase() === 'stage') {
-        verifyPasscode(STAGE_SCREEN_KEY);
-      }
-      // 3. Mobile Phone QR Pass: Direct scan carrying character payload (Bypasses login completely and locks to player view)
-      else if (urlRole === 'player' || (urlCode && urlName)) {
-        let existingPlayer = gameState.players.find(p => p.pin === urlCode);
-        if (!existingPlayer) {
-          existingPlayer = {
-            id: 'p_' + urlCode + '_' + Math.random().toString(36).substr(2, 4),
-            pin: urlCode,
-            name: decodeURIComponent(urlName || "Scholar"),
-            affinity: urlAffinity,
-            level: urlLvl,
-            maxHp: 20,
-            hp: urlHp,
-            status: 'Active',
-            honorsTitle: "Novice Adept"
-          };
-          gameState.players.push(existingPlayer);
-        }
-
-        gameState.authenticatedRole = 'player';
-        gameState.activePlayerId = existingPlayer.id;
-        gameState.currentView = 'player';
-
-        // STRICT HIDE of GM deck and navigation for mobile phone
-        switchView('player');
-        document.getElementById('nav-tabs').classList.add('hidden');
-        document.getElementById('modal-code-gate').classList.add('hidden');
-        document.getElementById('modal-code-gate').classList.remove('flex');
-
-        sendNetworkPacket({ type: 'PLAYER_JOIN', player: existingPlayer });
-        showToast(`✨ Character Synced: Welcome ${existingPlayer.name}!`);
-        renderAllViews();
-      } else if (urlCode) {
-        verifyPasscode(urlCode);
-      } else {
-        openCodeGate();
-      }
-
-      initCrossDeviceNetwork();
-    }
-
-    function openCodeGate() {
-      document.getElementById('modal-code-gate').classList.remove('hidden');
-      document.getElementById('modal-code-gate').classList.add('flex');
-      document.getElementById('gate-passcode-input').value = '';
-      document.getElementById('gate-error').classList.add('hidden');
-      setTimeout(() => document.getElementById('gate-passcode-input').focus(), 150);
-    }
-
-    function handlePasscodeSubmit(e) {
-      if (e) e.preventDefault();
-      const code = document.getElementById('gate-passcode-input').value.trim();
-      verifyPasscode(code);
-    }
-
-    function verifyPasscode(code) {
-      if (!code) return;
-      const clean = code.toUpperCase();
-
-      // Case A: Gamemaster Master Key
-      if (clean === MASTER_GM_KEY) {
-        gameState.authenticatedRole = 'gm';
-        gameState.currentView = 'gm';
-        document.getElementById('modal-code-gate').classList.add('hidden');
-        document.getElementById('modal-code-gate').classList.remove('flex');
-        document.getElementById('nav-tabs').classList.remove('hidden');
-        switchView('gm');
-        showToast("👑 Welcome, Gamemaster. Full Deck Unlocked.");
-        renderAllViews();
-        return;
-      }
-
-      // Case B: Projector Big Screen
-      if (clean === STAGE_SCREEN_KEY) {
-        gameState.authenticatedRole = 'stage';
-        gameState.currentView = 'stage';
-        document.getElementById('modal-code-gate').classList.add('hidden');
-        document.getElementById('modal-code-gate').classList.remove('flex');
-        document.getElementById('nav-tabs').classList.add('hidden');
-        switchView('stage');
-        showToast("🖥 Stage HUD Active. Display Locked.");
-        renderAllViews();
-        return;
-      }
-
-      // Case C: Student Hero PIN
-      const matched = gameState.players.find(p => p.pin === code || p.pin === clean);
-      if (matched) {
-        gameState.authenticatedRole = 'player';
-        gameState.activePlayerId = matched.id;
-        gameState.currentView = 'player';
-        document.getElementById('modal-code-gate').classList.add('hidden');
-        document.getElementById('modal-code-gate').classList.remove('flex');
-        document.getElementById('nav-tabs').classList.add('hidden');
-        switchView('player');
-        showToast(`✨ Character Synced: Welcome ${matched.name}!`);
-        renderAllViews();
-        return;
-      }
-
-      // Invalid passcode
-      const err = document.getElementById('gate-error');
-      err.innerText = "Passcode not recognized. Please scan your Hero QR Pass or speak to the Gamemaster.";
-      err.classList.remove('hidden');
     }
 
     function switchView(viewName) {
       gameState.currentView = viewName;
 
-      ['gm', 'stage', 'player', 'honors'].forEach(v => {
-        const el = document.getElementById(`view-${v}`);
-        const btn = document.getElementById(`tab-btn-${v}`);
-        if (el) {
-          if (v === viewName) {
-            el.classList.remove('hidden');
-          } else {
-            el.classList.add('hidden');
-          }
-        }
-        if (btn) {
-          if (v === viewName) {
-            btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition flex items-center gap-1.5";
-          } else {
-            btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1.5";
-          }
+      const views = {
+        gm: document.getElementById('view-gm'),
+        stage: document.getElementById('view-stage'),
+        player: document.getElementById('view-player'),
+        honors: document.getElementById('view-honors')
+      };
+
+      Object.entries(views).forEach(([key, el]) => {
+        if (!el) return;
+        if (key === viewName) {
+          el.classList.remove('hidden');
+        } else {
+          el.classList.add('hidden');
         }
       });
+
+      const tabs = {
+        gm: document.getElementById('tab-btn-gm'),
+        stage: document.getElementById('tab-btn-stage'),
+        player: document.getElementById('tab-btn-player'),
+        honors: document.getElementById('tab-btn-honors')
+      };
+
+      Object.entries(tabs).forEach(([key, btn]) => {
+        if (!btn) return;
+        if (key === viewName) {
+          btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 transition flex items-center gap-1.5";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1.5";
+        }
+      });
+
+      const roleBadge = document.getElementById('role-badge');
+      if (roleBadge) {
+        const labels = {
+          gm: 'Gamemaster',
+          stage: 'Stage HUD',
+          player: 'Player Phone',
+          honors: 'Honors Wall'
+        };
+        roleBadge.innerText = labels[viewName] || viewName.toUpperCase();
+      }
 
       renderAllViews();
     }
 
+    function renderAllViews() {
+      if (gameState.currentView === 'gm' || gameState.authenticatedRole === 'gm') {
+        renderGmView();
+      }
+      if (gameState.currentView === 'stage') {
+        renderStageView();
+      }
+      if (gameState.currentView === 'player') {
+        renderPlayerView();
+      }
+      if (gameState.currentView === 'honors') {
+        renderHonorsView();
+      }
+      updatePhaseUI();
+    }
+
     function setPhase(phase) {
       gameState.currentPhase = phase;
-
-      const titles = {
-        discussion: "Phase 1: Strategic Council",
-        actions: "Phase 2: Action Submissions & Dual Rolls",
-        consult: "Phase 3: AI Consultation & Narrative Synthesis",
-        outcome: "Phase 4: Cinematic Outcome & Resolution"
-      };
-      const subs = {
-        discussion: "Walk through ideas collectively. Player mobile controllers are currently input-locked.",
-        actions: "Player mobile interfaces are UNLOCKED. Students roll Spark and Surge d10 dice.",
-        consult: "Review submitted student actions. Use Gemini to weave 3 plausible outcomes.",
-        outcome: "The outcome has been broadcast to the projector stage screen! Adjust boss or student HP."
-      };
-
-      const titleEl = document.getElementById('gm-phase-display');
-      const subEl = document.getElementById('gm-phase-sub');
-      if (titleEl) {
-        titleEl.innerHTML = `
-          <i class="fa-solid fa-${phase === 'discussion' ? 'comments' : phase === 'actions' ? 'dice-d20' : phase === 'consult' ? 'brain' : 'bolt'} text-amber-400"></i>
-          ${titles[phase]}
-        `;
-      }
-      if (subEl) subEl.innerText = subs[phase];
-
       if (phase === 'discussion') {
         gameState.submissions = {};
         playerRollCache = {};
       }
 
-      showToast(`⚡ Phase advanced: ${titles[phase]}`);
       sendNetworkPacket({ type: 'PHASE_CHANGE', phase: phase });
+      updatePhaseUI();
       saveStateAndBroadcast();
       renderAllViews();
     }
 
-    function renderAllViews() {
-      renderGmView();
-      renderStageView();
-      renderPlayerView();
-      renderHonorsView();
+    function updatePhaseUI() {
+      const displayEl = document.getElementById('gm-phase-display');
+      const subEl = document.getElementById('gm-phase-sub');
+      if (!displayEl || !subEl) return;
 
-      const roleBadge = document.getElementById('role-badge');
-      if (roleBadge) {
-        if (gameState.authenticatedRole === 'gm') {
-          roleBadge.innerText = "Gamemaster";
-          roleBadge.className = "text-[10px] font-sans uppercase font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30";
-        } else if (gameState.authenticatedRole === 'stage') {
-          roleBadge.innerText = "Stage Display";
-          roleBadge.className = "text-[10px] font-sans uppercase font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30";
-        } else {
-          roleBadge.innerText = "Scholar Controller";
-          roleBadge.className = "text-[10px] font-sans uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+      const phaseConfigs = {
+        discussion: {
+          title: '<i class="fa-solid fa-comments text-amber-400"></i> Phase 1: Strategic Council',
+          sub: 'Walk through ideas collectively. Player mobile controllers are currently input-locked.'
+        },
+        actions: {
+          title: '<i class="fa-solid fa-dice-d20 text-emerald-400"></i> Phase 2: Action Rolls Unlocked',
+          sub: 'Scholars may now roll Die 1 and Die 2 on their mobile phones and submit intents.'
+        },
+        consult: {
+          title: '<i class="fa-solid fa-brain text-indigo-400"></i> Phase 3: AI Consultation',
+          sub: 'Review submitted rolls and trigger Gemini to synthesize 3 branching outcomes.'
+        },
+        outcome: {
+          title: '<i class="fa-solid fa-bolt text-rose-400"></i> Phase 4: Resolution & Broadcast',
+          sub: 'Outcome broadcasted to the big screen. Boss HP and Scholar Calm updated.'
+        }
+      };
+
+      const cur = phaseConfigs[gameState.currentPhase] || phaseConfigs['discussion'];
+      displayEl.innerHTML = cur.title;
+      subEl.innerText = cur.sub;
+    }
+
+    function openCodeGate() {
+      const modal = document.getElementById('modal-code-gate');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+      const errEl = document.getElementById('gate-error');
+      if (errEl) errEl.classList.add('hidden');
+    }
+
+    function closeCodeGate() {
+      const modal = document.getElementById('modal-code-gate');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function handlePasscodeSubmit(event) {
+      if (event) event.preventDefault();
+      const input = document.getElementById('gate-passcode-input');
+      const errEl = document.getElementById('gate-error');
+      if (!input) return;
+
+      const code = input.value.trim().toUpperCase();
+      input.value = '';
+
+      if (code === MASTER_GM_KEY.toUpperCase()) {
+        gameState.authenticatedRole = 'gm';
+        closeCodeGate();
+        switchView('gm');
+        showToast("👑 Welcome, Gamemaster. Full controls unlocked.");
+        return;
+      }
+
+      if (code === STAGE_SCREEN_KEY.toUpperCase()) {
+        gameState.authenticatedRole = 'stage';
+        closeCodeGate();
+        switchView('stage');
+        const nav = document.getElementById('nav-tabs');
+        if (nav) nav.classList.add('hidden');
+        showToast("🖥️ Stage Screen HUD activated.");
+        return;
+      }
+
+      const matchedPlayer = gameState.players.find(p => p.pin === code);
+      if (matchedPlayer) {
+        gameState.authenticatedRole = 'player';
+        gameState.activePlayerId = matchedPlayer.id;
+        closeCodeGate();
+        switchView('player');
+        const nav = document.getElementById('nav-tabs');
+        if (nav) nav.classList.add('hidden');
+        showToast(`✨ Welcome scholar ${matchedPlayer.name}!`);
+        return;
+      }
+
+      if (errEl) {
+        errEl.innerText = "Passcode not recognized. Please scan your Hero QR Pass or speak to the Gamemaster.";
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    function loadInitialState() {
+      const params = new URLSearchParams(window.location.search);
+      const gmKey = params.get('gm');
+      const screenKey = params.get('screen');
+      const roleParam = params.get('role');
+      const codeParam = params.get('code');
+      const idParam = params.get('id');
+      const nameParam = params.get('name');
+      const elemParam = params.get('elem');
+      const lvlParam = params.get('lvl');
+      const hpParam = params.get('hp');
+
+      const isGm = (gmKey && gmKey.toUpperCase() === MASTER_GM_KEY.toUpperCase());
+
+      // Only the GM laptop loads master state from localStorage
+      if (isGm) {
+        try {
+          const saved = localStorage.getItem('dnd_lite_state_' + activeRoomId);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && typeof parsed === 'object') {
+              gameState.currentPhase = parsed.currentPhase || gameState.currentPhase;
+              gameState.activeNodeId = parsed.activeNodeId || gameState.activeNodeId;
+              gameState.bossHp = (typeof parsed.bossHp === 'number') ? parsed.bossHp : gameState.bossHp;
+              gameState.bossMaxHp = parsed.bossMaxHp || gameState.bossMaxHp;
+              gameState.storyline = parsed.storyline || gameState.storyline;
+              if (Array.isArray(parsed.players)) {
+                gameState.players = parsed.players;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("Could not load local state:", err);
         }
       }
+
+      if (isGm) {
+        gameState.authenticatedRole = 'gm';
+        closeCodeGate();
+        switchView('gm');
+      } else if (screenKey && screenKey.toUpperCase() === 'STAGE') {
+        gameState.authenticatedRole = 'stage';
+        closeCodeGate();
+        switchView('stage');
+        const nav = document.getElementById('nav-tabs');
+        if (nav) nav.classList.add('hidden');
+      } else if (roleParam === 'player' || (nameParam && elemParam) || codeParam || idParam) {
+        gameState.authenticatedRole = 'player';
+        closeCodeGate();
+
+        let player = null;
+        if (idParam) {
+          player = gameState.players.find(p => p.id === idParam);
+        }
+        if (!player && codeParam) {
+          player = gameState.players.find(p => p.pin === codeParam);
+        }
+
+        // If newly joining via self-contained QR pass parameters
+        if (!player && nameParam && elemParam) {
+          player = {
+            id: idParam || ('p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4)),
+            pin: codeParam || Math.floor(1000 + Math.random() * 9000).toString(),
+            name: decodeURIComponent(nameParam),
+            affinity: decodeURIComponent(elemParam),
+            level: parseInt(lvlParam, 10) || 1,
+            maxHp: parseInt(hpParam, 10) || 20,
+            hp: parseInt(hpParam, 10) || 20,
+            status: 'Active',
+            honorsTitle: 'Novice Adept'
+          };
+          gameState.players.push(player);
+        }
+
+        if (player) {
+          gameState.activePlayerId = player.id;
+        }
+
+        switchView('player');
+        const nav = document.getElementById('nav-tabs');
+        if (nav) nav.classList.add('hidden');
+      } else {
+        openCodeGate();
+      }
+
+      initCrossDeviceNetwork();
     }
 
     function renderGmView() {
@@ -1367,9 +1416,22 @@
     function renderPlayerView() {
       let activePlayer = gameState.players.find(p => p.id === gameState.activePlayerId);
 
-      if (!activePlayer && gameState.players.length > 0) {
-        activePlayer = gameState.players[0];
-        gameState.activePlayerId = activePlayer.id;
+      // If activePlayerId is not yet in gameState.players, do not force-assign to players[0]
+      if (!activePlayer && gameState.activePlayerId) {
+        const params = new URLSearchParams(window.location.search);
+        const nameParam = params.get('name');
+        const elemParam = params.get('elem');
+        if (nameParam && elemParam) {
+          activePlayer = {
+            id: gameState.activePlayerId,
+            pin: params.get('code') || '----',
+            name: decodeURIComponent(nameParam),
+            affinity: decodeURIComponent(elemParam),
+            level: parseInt(params.get('lvl'), 10) || 1,
+            maxHp: parseInt(params.get('hp'), 10) || 20,
+            hp: parseInt(params.get('hp'), 10) || 20
+          };
+        }
       }
 
       const activeNode = ENCOUNTER_NODES.find(n => n.id === gameState.activeNodeId) || ENCOUNTER_NODES[0];
@@ -1383,7 +1445,7 @@
 
       if (!activePlayer) {
         document.getElementById('player-display-name').innerText = "Scholar";
-        document.getElementById('player-display-affinity').innerText = "Select or enroll your hero";
+        document.getElementById('player-display-affinity').innerText = "Awaiting assignment from GM...";
         document.getElementById('player-display-pin').innerText = "----";
         return;
       }
@@ -1562,10 +1624,10 @@
         </div>
       `;
 
+      // Transmit the action turn packet only (never broadcast entire full state from player phone)
       sendNetworkPacket({ type: 'PLAYER_SUBMIT', submission: submissionData });
       showToast(`🔒 Action locked and sent to GM!`);
-      saveStateAndBroadcast();
-      renderAllViews();
+      renderPlayerView();
     }
 
     function registerWalkInPlayer() {
@@ -1625,8 +1687,22 @@
       gameState.players = gameState.players.filter(p => p.id !== playerId);
       delete gameState.submissions[playerId];
       delete playerRollCache[playerId];
+      sendNetworkPacket({ type: 'PLAYER_REMOVE', playerId: playerId });
       saveStateAndBroadcast();
       renderAllViews();
+    }
+
+    function clearAllOldCharacters() {
+      gameState.players = [];
+      gameState.submissions = {};
+      playerRollCache = {};
+      try {
+        localStorage.removeItem('dnd_lite_state_' + activeRoomId);
+      } catch (e) {}
+      sendNetworkPacket({ type: 'ROSTER_RESET' });
+      saveStateAndBroadcast();
+      renderAllViews();
+      showToast("🧹 Clean slate: All characters cleared across the room!");
     }
 
     function alterBossHp(delta) {
@@ -1671,9 +1747,9 @@
       const mount = document.getElementById('qrcode-mount');
       mount.innerHTML = '';
 
-      // Direct scan link includes role=player to immediately lock mobile phone to player view
+      // Direct link embeds player ID and parameters so phone opens straight to their sheet
       const baseUri = window.location.origin + window.location.pathname;
-      const targetUrl = `${baseUri}?room=${activeRoomId}&role=player&code=${player.pin}&name=${encodeURIComponent(player.name)}&elem=${encodeURIComponent(player.affinity)}&lvl=${player.level || 1}&hp=${player.hp || 20}`;
+      const targetUrl = `${baseUri}?room=${activeRoomId}&role=player&id=${player.id}&code=${player.pin}&name=${encodeURIComponent(player.name)}&elem=${encodeURIComponent(player.affinity)}&lvl=${player.level || 1}&hp=${player.hp || 20}`;
 
       try {
         if (typeof QRCode !== 'undefined') {
@@ -1705,7 +1781,7 @@
     function copyDirectHeroLink() {
       if (!activeQrPlayer) return;
       const baseUri = window.location.origin + window.location.pathname;
-      const targetUrl = `${baseUri}?room=${activeRoomId}&role=player&code=${activeQrPlayer.pin}&name=${encodeURIComponent(activeQrPlayer.name)}&elem=${encodeURIComponent(activeQrPlayer.affinity)}&lvl=${activeQrPlayer.level || 1}&hp=${activeQrPlayer.hp || 20}`;
+      const targetUrl = `${baseUri}?room=${activeRoomId}&role=player&id=${activeQrPlayer.id}&code=${activeQrPlayer.pin}&name=${encodeURIComponent(activeQrPlayer.name)}&elem=${encodeURIComponent(activeQrPlayer.affinity)}&lvl=${activeQrPlayer.level || 1}&hp=${activeQrPlayer.hp || 20}`;
 
       const tempInput = document.createElement("input");
       tempInput.value = targetUrl;
